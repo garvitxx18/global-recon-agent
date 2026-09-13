@@ -28,23 +28,46 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: cloud-run
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ secrets.GCP_REGION }}
+      WIF_PROVIDER: ${{ secrets.WIF_PROVIDER }}
+      WIF_SERVICE_ACCOUNT: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+      RECON_API_BASE_URL: ${{ secrets.RECON_API_BASE_URL }}
+      RECON_USER_EMAIL: ${{ secrets.RECON_USER_EMAIL }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check required secrets
+        run: |
+          missing=0
+          for name in GCP_PROJECT_ID GCP_REGION WIF_PROVIDER WIF_SERVICE_ACCOUNT RECON_API_BASE_URL RECON_USER_EMAIL; do
+            if [ -z "${!name}" ]; then
+              echo "Missing repository secret: $name"
+              missing=1
+            else
+              echo "Found secret: $name"
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Add these under Settings → Secrets and variables → Actions → Secrets"
+            exit 1
+          fi
 
       - id: auth
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
-          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
       - uses: google-github-actions/setup-gcloud@v2
 
       - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
+        run: gcloud auth configure-docker "${{ secrets.GCP_REGION }}-docker.pkg.dev" --quiet
 
       - name: Build and push image
         env:
-          IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/adk-agents/global-recon-agent
+          IMAGE: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/adk-agents/global-recon-agent
         run: |
           docker build -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" .
           docker push "$IMAGE:${{ github.sha }}"
@@ -54,14 +77,14 @@ jobs:
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: global-recon-agent
-          region: ${{ vars.GCP_REGION }}
-          image: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/adk-agents/global-recon-agent:${{ github.sha }}
+          region: ${{ secrets.GCP_REGION }}
+          image: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/adk-agents/global-recon-agent:${{ github.sha }}
           flags: --port=8080 --memory=1Gi --cpu=1 --min-instances=0 --max-instances=3 --allow-unauthenticated
           env_vars: |
-            GOOGLE_CLOUD_PROJECT=${{ vars.GCP_PROJECT_ID }}
-            GOOGLE_CLOUD_LOCATION=${{ vars.GCP_REGION }}
+            GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }}
+            GOOGLE_CLOUD_LOCATION=${{ secrets.GCP_REGION }}
             GOOGLE_GENAI_USE_VERTEXAI=true
-            RECON_API_BASE_URL=${{ vars.RECON_API_BASE_URL }}
-            RECON_USER_EMAIL=${{ vars.RECON_USER_EMAIL }}
+            RECON_API_BASE_URL=${{ secrets.RECON_API_BASE_URL }}
+            RECON_USER_EMAIL=${{ secrets.RECON_USER_EMAIL }}
             RECON_JOB_POLL_SECONDS=2
             RECON_JOB_TIMEOUT_SECONDS=180
