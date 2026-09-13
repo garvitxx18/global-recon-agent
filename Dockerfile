@@ -13,4 +13,4 @@ COPY app ./app
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "adk api_server --host 0.0.0.0 --port ${PORT:-8080} app"]
+CMD ["sh", "-c", "adk api_server --host 0.0.0.0 --port ${PORT:-8080} --allow_origins=* --allow_origins=http://localhost:5173 --allow_origins=http://127.0.0.1:5173 app"]
