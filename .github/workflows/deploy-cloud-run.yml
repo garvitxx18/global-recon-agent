@@ -1,0 +1,67 @@
+name: Deploy Global Recon agent to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Run tests
+        run: pytest
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: cloud-run
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
+
+      - name: Build and push image
+        env:
+          IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/adk-agents/global-recon-agent
+        run: |
+          docker build -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" .
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
+
+      - name: Deploy Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: global-recon-agent
+          region: ${{ vars.GCP_REGION }}
+          image: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/adk-agents/global-recon-agent:${{ github.sha }}
+          flags: --port=8080 --memory=1Gi --cpu=1 --min-instances=0 --max-instances=3 --allow-unauthenticated
+          env_vars: |
+            GOOGLE_CLOUD_PROJECT=${{ vars.GCP_PROJECT_ID }}
+            GOOGLE_CLOUD_LOCATION=${{ vars.GCP_REGION }}
+            GOOGLE_GENAI_USE_VERTEXAI=true
+            RECON_API_BASE_URL=${{ vars.RECON_API_BASE_URL }}
+            RECON_USER_EMAIL=${{ vars.RECON_USER_EMAIL }}
+            RECON_JOB_POLL_SECONDS=2
+            RECON_JOB_TIMEOUT_SECONDS=180
