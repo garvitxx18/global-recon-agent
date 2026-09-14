@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from app.global_recon.clients.recon_client import ReconApiError, ReconClient, read_upload_source
+from app.global_recon.clients.recon_client import ReconApiError, ReconClient
 
 
 def _client(handler) -> ReconClient:
@@ -55,11 +55,3 @@ def test_missing_email_fails_before_request():
     client = ReconClient(base_url="http://recon.test", user_email="")
     with pytest.raises(ReconApiError, match="RECON_USER_EMAIL"):
         client.get_dataset("ds_1")
-
-
-def test_read_upload_source_from_path(tmp_path):
-    file_path = tmp_path / "left.csv"
-    file_path.write_text("tradeId,qty\nT001,1\n")
-    name, content = read_upload_source(file_path=str(file_path))
-    assert name == "left.csv"
-    assert b"T001" in content

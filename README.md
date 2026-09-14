@@ -203,15 +203,15 @@ These are real Java endpoints. No extra recon APIs were invented.
 
 | Tool | API |
 |---|---|
-| `upload_dataset` | `POST /api/v1/datasets` |
 | `get_dataset` | `GET /api/v1/datasets/{id}` |
 | `get_dataset_profile` | `GET /api/v1/datasets/{id}/profile` |
-| `get_dataset_records` | `GET /api/v1/datasets/{id}/records` |
 | `discover_recon_plan` | `POST /api/v1/recon-plans/discover` then poll job |
 | `get_recon_plan` / `update_recon_plan` / `approve_recon_plan` | plan APIs |
 | `start_recon_run` | `POST /api/v1/recon-runs` then poll job |
-| `get_recon_run` / `get_recon_summary` / `get_recon_results` | run APIs |
-| `save_comparison` / `list_comparisons` | comparison APIs |
+| `get_recon_run` / `get_recon_results` | run APIs |
+
+The UI uploads files and downloads the break-report CSV. The agent does not
+upload, poll jobs itself, or save comparisons.
 
 A future repeat-job screen (`planId` + two new files, no discovery) still needs
 a Java endpoint. This agent will not pretend that API exists.

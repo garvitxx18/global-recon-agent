@@ -13,7 +13,7 @@ TERMINAL_JOB_STATUSES = {"COMPLETED", "FAILED"}
 
 
 def job_poll_seconds() -> float:
-    return float(os.getenv("RECON_JOB_POLL_SECONDS", "2"))
+    return float(os.getenv("RECON_JOB_POLL_SECONDS", "0.5"))
 
 
 def job_timeout_seconds() -> float:
@@ -70,5 +70,4 @@ def start_run_and_wait(client: ReconClient, recon_plan_id: str) -> dict[str, Any
     if not run_id:
         raise ReconApiError("Run completed without a run id")
     run = client.get_run(str(run_id))
-    summary = client.get_run_summary(str(run_id))
-    return {"job": completed, "run": run, "summary": summary}
+    return {"job": completed, "run": run}

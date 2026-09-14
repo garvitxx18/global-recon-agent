@@ -86,5 +86,5 @@ jobs:
             GOOGLE_GENAI_USE_VERTEXAI=true
             RECON_API_BASE_URL=${{ secrets.RECON_API_BASE_URL }}
             RECON_USER_EMAIL=${{ secrets.RECON_USER_EMAIL }}
-            RECON_JOB_POLL_SECONDS=2
+            RECON_JOB_POLL_SECONDS=0.5
             RECON_JOB_TIMEOUT_SECONDS=180
