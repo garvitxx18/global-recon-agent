@@ -1,22 +1,14 @@
 # Global Recon ADK agent
 
-Standard Google ADK agent for the Global Recon chat workspace.
-
-The agent talks to the existing Java APIs. It does not compute MATCHED / BREAK
-itself. Java still profiles files, validates mappings, and runs reconciliation.
+Mapping-only Google ADK agent. Java still uploads files, profiles columns,
+validates mappings, and computes MATCHED / BREAK.
 
 ```text
-Chat UI
-   ↓
-root_agent (Gemini)
-   ↓
-tools
-   ↓
-Global Recon Java service
+UI  →  Java recon service  →  this agent (JSON mappings only)
 ```
 
-Copy `app/global_recon/` into a company ADK repo if you later move this into an
-enterprise template. Only `MODEL` in `agent.py` should need to change.
+The agent has no tools. Java sends dataset profiles in the prompt and parses
+`keyMappings` / `fieldMappings` JSON from the reply.
 
 ## Local run
 
@@ -25,13 +17,6 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
 cp .env.example .env
-```
-
-Point `.env` at a running recon service and a user email:
-
-```bash
-RECON_API_BASE_URL=http://127.0.0.1:8080
-RECON_USER_EMAIL=tester@company.com
 ```
 
 For local Gemini, either set `GOOGLE_API_KEY` or use Vertex:
@@ -157,61 +142,19 @@ In the GitHub repo: **Settings → Secrets and variables → Actions → Variabl
 | `GCP_REGION` | `us-central1` |
 | `WIF_PROVIDER` | `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github` |
 | `WIF_SERVICE_ACCOUNT` | `github-adk-deployer@PROJECT_ID.iam.gserviceaccount.com` |
-| `RECON_API_BASE_URL` | public or VPC URL of the Java recon service |
-| `RECON_USER_EMAIL` | default email the agent sends as `X-User-Email` |
 
 Create a GitHub Environment named `cloud-run` (the workflow uses it). You can
 leave protection rules off until you want approvals.
 
-### 6. Network
-
-Cloud Run must reach the Java service. If recon is only on localhost, the
-deployed agent cannot call it. Use a deployed recon URL, Cloud Run service-to-service,
-or a tunnel.
-
-`RECON_USER_EMAIL` is a temporary default. The chat UI should later pass the
-signed-in user into the ADK session so the agent does not share one email.
-
-### 7. First deploy
+### 6. First deploy
 
 Push to `main` or run the workflow from **Actions → Deploy Global Recon agent to Cloud Run → Run workflow**.
 
 After it succeeds, open the Cloud Run URL. The ADK API server is there.
-For a browser chat during bring-up you can also deploy once with UI:
+Java mapping discovery calls `/apps/global_recon/.../sessions` then `/run`.
 
-```bash
-adk deploy cloud_run \
-  --project="$GOOGLE_CLOUD_PROJECT" \
-  --region="$GOOGLE_CLOUD_LOCATION" \
-  --service_name=global-recon-agent \
-  --with_ui \
-  app/global_recon
-```
-
-Prefer the GitHub Actions Docker path for repeatable deploys.
-
-### 8. If the workflow fails
+### 7. If the workflow fails
 
 - `WIF_PROVIDER` / `WIF_SERVICE_ACCOUNT` mismatch → auth step fails
 - Artifact Registry repo `adk-agents` missing → docker push fails
 - Vertex AI API or `roles/aiplatform.user` missing → agent starts but model calls fail
-- `RECON_API_BASE_URL` unreachable → tools return `success: false`
-
-## What the agent can call
-
-These are real Java endpoints. No extra recon APIs were invented.
-
-| Tool | API |
-|---|---|
-| `get_dataset` | `GET /api/v1/datasets/{id}` |
-| `get_dataset_profile` | `GET /api/v1/datasets/{id}/profile` |
-| `discover_recon_plan` | `POST /api/v1/recon-plans/discover` then poll job |
-| `get_recon_plan` / `update_recon_plan` / `approve_recon_plan` | plan APIs |
-| `start_recon_run` | `POST /api/v1/recon-runs` then poll job |
-| `get_recon_run` / `get_recon_results` | run APIs |
-
-The UI uploads files and downloads the break-report CSV. The agent does not
-upload, poll jobs itself, or save comparisons.
-
-A future repeat-job screen (`planId` + two new files, no discovery) still needs
-a Java endpoint. This agent will not pretend that API exists.
